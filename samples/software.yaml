@@ -1,0 +1,98 @@
+name: Software
+description: "Software"
+type: Workflow Definition
+goal: "Your task is to write a program in Python to print the first 10 prime numbers."
+start_agent: Planner
+agents:
+- name: Planner
+  purpose: "Plan out what needs to be done to achieve the goal"
+  system_prompt: |
+    Your objective is to create a plan to achieve the users goal.
+    Please create a detailed plan outlining the tasks the other agents need to do. 
+    You don't need to create any tasks for yourself
+    
+    Each task in the plan needs to assigned to an agent. The following are the available agents:
+
+    Agents:
+    Name | Goal |
+    {{ range .Agents }}
+      {{ .Name }} | {{ .Purpose }} |
+    {{ end }}
+
+    Please call the TaskComplete tool after you have created the plan
+  model: claude-3-5-sonnet-20240620
+  temperature: 0.2
+  next_agent: Programmer
+  available_tools: 
+  - PlanCreator
+  - NextAgentSelector
+
+- name: Programmer
+  purpose: "Write the program"
+  system_prompt: |
+    You are a programmer. 
+    A plan to complete this goal has been created for you. You can use the `GetPlan` tool to fetch the plan.
+
+    As you complete tasks please update the plan to indicate the progress of your tasks using the `PlanUpdater` tool.
+    Please call the NextAgentSelector tool after you have completed your task and want to have over to the next agent working
+    on the goal.
+  model: claude-3-5-sonnet-20240620
+  temperature: 0.2
+  next_agent: Reviewer
+  # next_agent_function: |
+  #   def next_agent(state):
+  #     print(state)
+  #     return "Reviewer"
+  available_tools: 
+  - Reader
+  - Writer
+  - CommandRunner
+  - NextAgentSelector
+  - PlanUpdater
+  - GetPlan
+
+
+- name: Reviewer
+  purpose: "Review the program"
+  system_prompt: |
+    You are a reviewer. Your role is to review the code created by the programmer.
+    A plan to complete this goal has been created for you. You can use the `GetPlan` tool to fetch the plan.
+
+    As you complete tasks please update the plan to indicate the progress of your tasks using the `PlanUpdater` tool.
+    Please call the NextAgentSelector tool after you have completed your task and want to have over to the next agent working
+    on the goal.
+
+  model: claude-3-5-sonnet-20240620
+  temperature: 0.2
+  next_agent: End
+  available_tools: 
+  - Reader
+  - NextAgentSelector
+  - PlanUpdater
+  - GetPlan
+
+tools:
+- name: Search
+  description: "Google search for a term"
+  parameters:
+  - name: term
+    description: "The term to search for"
+    type: string
+  function: |
+    def search(term):
+      result = post('https://google.serper.dev/search', {
+        "X-API-KEY": getEnv("SERPER_KEY"),
+        "Content-Type": "application/json"
+      }, '{"q": "' + term + '"}')
+      return result
+# - name: Reader
+#   description: "Read files in the filesystem"
+# - name: Writer
+#   description: "Write files in the filesystem, create directories etc."
+# - name: CommanderRunner
+#   description: "Run commands such as listing files, installing software, running a program"
+# - name: NextAgentSelector
+#   description: "Invoked by an agent when their task is complete and when they'd want to handover to the next agent for revisions to previous tasks or for next tasks to complete the goal."
+# - name: GetPlan
+#   description: "Invoked by an agent to get the plan and also when they want to update the plan"
+

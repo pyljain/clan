@@ -77,7 +77,7 @@ func (a *Anthropic) Generate(messages []Message) ([]Message, error) {
 	}
 
 	bufferedReq := bytes.NewBuffer(rbBytes)
-	log.Printf("Request to Anthropic is: %+v", string(rbBytes))
+	// log.Printf("Request to Anthropic is: %+v", string(rbBytes))
 
 	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/messages", a.baseURL), bufferedReq)
 	if err != nil {
@@ -97,6 +97,10 @@ func (a *Anthropic) Generate(messages []Message) ([]Message, error) {
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("Error calling Anthropic %s", string(respBytes))
 	}
 
 	log.Printf("Response from Anthropic %+v", string(respBytes))

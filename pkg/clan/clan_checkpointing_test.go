@@ -3,7 +3,6 @@ package clan
 import (
 	"clan/pkg/checkpointer"
 	"clan/pkg/llm"
-	"log"
 	"os"
 	"testing"
 
@@ -60,7 +59,7 @@ func TestCheckpointing(t *testing.T) {
 
 		ws.ReviewerMessages = append(ws.ReviewerMessages, result...)
 
-		log.Printf("Response from LLM %+v", result)
+		// log.Printf("Response from LLM %+v", result)
 
 		return ws, nil
 	})
@@ -101,19 +100,15 @@ func TestResume(t *testing.T) {
 	})
 
 	graph.AddConditionalEdge("Programmer", func(wsp *resumeExample) (string, error) {
-		log.Println("In programmer")
-		log.Printf("Value of hasRunBefore before if is evaluated is %v", hasRunBefore)
 		if !hasRunBefore {
 			hasRunBefore = true
-			log.Printf("Value of hasRunBefore in the if condition is %v", hasRunBefore)
-			return "Reviewer", nil
+			return "Pause", nil
 		}
 
-		return "End", nil
+		return "Reviewer", nil
 	})
 
 	graph.AddNode("Reviewer", func(ws *resumeExample) (*resumeExample, error) {
-		log.Println("In Reviewer")
 		ws.reviewerRun = true
 		return ws, nil
 	})
@@ -126,10 +121,10 @@ func TestResume(t *testing.T) {
 	dbPath := "./test_database.db"
 	cp, err := checkpointer.NewSQLite(dbPath)
 	require.NoError(t, err)
-	// defer func() {
-	// 	// err = os.Remove(dbPath)
-	// 	require.NoError(t, err)
-	// }()
+	defer func() {
+		err = os.Remove(dbPath)
+		require.NoError(t, err)
+	}()
 
 	state, err := graph.Execute(ExecuteOptions{
 		TraversalDepth: 3,

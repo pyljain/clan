@@ -7,10 +7,13 @@ import (
 	"fmt"
 )
 
-var NodeNotFoundErr = errors.New("node not found")
+var (
+	NodeNotFoundErr = errors.New("node not found")
+	NoStartNodeErr  = errors.New("start node not defined")
+)
 
 type ClanGraph[T any] struct {
-	Nodes       []*Node[T]
+	Nodes       map[string]*Node[T]
 	State       *T
 	CurrentNode *Node[T]
 }
@@ -24,6 +27,7 @@ type Node[T any] struct {
 func NewClanGraph[T any](initialState *T) *ClanGraph[T] {
 	return &ClanGraph[T]{
 		State: initialState,
+		Nodes: map[string]*Node[T]{},
 	}
 }
 
@@ -31,17 +35,36 @@ type ExecuteOptions struct {
 	TraversalDepth int
 	WorkflowID     string
 	Checkpointer   checkpointer.Checkpointer
+	StreamChannel  chan<- interface{}
+}
+
+type StreamState[T any] struct {
+	NodeName string
+	State    T
 }
 
 func (cg *ClanGraph[T]) Execute(options ExecuteOptions) (*T, error) {
+
+	if cg.CurrentNode == nil {
+		return nil, NoStartNodeErr
+	}
 
 	// Add end node to the graph
 	cg.AddNode("End", func(t *T) (*T, error) {
 		return t, nil
 	})
 
+	// Add pause node to the graph
+	cg.AddNode("Pause", func(t *T) (*T, error) {
+		return t, nil
+	})
+
 	if options.TraversalDepth == 0 {
 		options.TraversalDepth = 100
+	}
+
+	if options.StreamChannel != nil {
+		defer close(options.StreamChannel)
 	}
 
 	var currentDepth int
@@ -66,6 +89,10 @@ func (cg *ClanGraph[T]) Execute(options ExecuteOptions) (*T, error) {
 	}
 
 	for {
+		if cg.CurrentNode.Name == "Pause" {
+			break
+		}
+
 		var err error
 		err = cg.checkpoint(options, currentDepth)
 		if err != nil {
@@ -100,10 +127,10 @@ func (cg *ClanGraph[T]) Execute(options ExecuteOptions) (*T, error) {
 }
 
 func (cg *ClanGraph[T]) AddNode(nodeName string, nodeFn func(*T) (*T, error)) {
-	cg.Nodes = append(cg.Nodes, &Node[T]{
+	cg.Nodes[nodeName] = &Node[T]{
 		Name:   nodeName,
 		NodeFn: nodeFn,
-	})
+	}
 }
 
 func (cg *ClanGraph[T]) AddConditionalEdge(nodeName string, fn func(*T) (string, error)) error {
@@ -122,10 +149,10 @@ func (cg *ClanGraph[T]) AddEdge(nodeFromName, nodeToName string) error {
 }
 
 func (cg *ClanGraph[T]) findNodebyName(name string) *Node[T] {
-	for _, nd := range cg.Nodes {
-		if nd.Name == name {
-			return nd
-		}
+
+	val, exists := cg.Nodes[name]
+	if exists {
+		return val
 	}
 
 	return nil
@@ -145,6 +172,13 @@ func (cg *ClanGraph[T]) checkpoint(options ExecuteOptions, currentDepth int) err
 		})
 		if err != nil {
 			return err
+		}
+	}
+
+	if options.StreamChannel != nil {
+		options.StreamChannel <- StreamState[T]{
+			NodeName: cg.CurrentNode.Name,
+			State:    *cg.State,
 		}
 	}
 

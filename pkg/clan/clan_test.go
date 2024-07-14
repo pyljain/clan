@@ -2,7 +2,6 @@ package clan
 
 import (
 	"clan/pkg/llm"
-	"log"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -57,8 +56,6 @@ func TestClan(t *testing.T) {
 		}
 
 		ws.ReviewerMessages = append(ws.ReviewerMessages, result...)
-
-		log.Printf("Response from LLM %+v", result)
 
 		return ws, nil
 	})
