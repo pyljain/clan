@@ -3,6 +3,9 @@ description: "Search"
 type: Workflow Definition
 goal: "Your task is to write an essay on the current Wimbledon champion."
 start_agent: Researcher
+checkpoint:
+  type: sqlite3
+  connection_string: "./wimbledon.db"
 agents:
 - name: Researcher
   purpose: "Find information and write an essay"

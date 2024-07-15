@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"clan/pkg/checkpointer"
 	"clan/pkg/clan"
 	"clan/pkg/llm"
 	"clan/pkg/planning"
@@ -13,7 +14,7 @@ import (
 
 var NoAgentsDefinedErr = errors.New("no agents defined")
 
-func Execute(definition *WorkflowDefinition) (chan interface{}, error) {
+func Execute(definition *WorkflowDefinition, workflowID string) (chan interface{}, error) {
 	streamChannel := make(chan interface{})
 	ws := WorkflowState{
 		AgentHistory: make(map[string][]llm.Message),
@@ -79,9 +80,15 @@ func Execute(definition *WorkflowDefinition) (chan interface{}, error) {
 				agentHistory := ws.AgentHistory[agent.Name]
 				latestRoleEntry := agentHistory[len(agentHistory)-1].Role
 				if latestRoleEntry == "user" {
-					currentText := agentHistory[len(agentHistory)-1].Content[0].Text
-					currentText = fmt.Sprintf("%s\nThe summaries for the tasks completed by other agents who have worked on this so far are: %s", currentText, string(summaryBytes))
-					agentHistory[len(agentHistory)-1].Content[0].Text = currentText
+					if agentHistory[len(agentHistory)-1].Content[0].ContentType == "tool_result" {
+						currentText := agentHistory[len(agentHistory)-1].Content[0].Content
+						currentText = fmt.Sprintf("%s\nThe summaries for the tasks completed by other agents who have worked on this so far are: %s", currentText, string(summaryBytes))
+						agentHistory[len(agentHistory)-1].Content[0].Content = currentText
+					} else {
+						currentText := agentHistory[len(agentHistory)-1].Content[0].Text
+						currentText = fmt.Sprintf("%s\nThe summaries for the tasks completed by other agents who have worked on this so far are: %s", currentText, string(summaryBytes))
+						agentHistory[len(agentHistory)-1].Content[0].Text = currentText
+					}
 				} else {
 					ws.AgentHistory[agent.Name] = append(ws.AgentHistory[agent.Name], llm.Message{
 						Role: "user",
@@ -202,7 +209,7 @@ func Execute(definition *WorkflowDefinition) (chan interface{}, error) {
 					Role: "user",
 					Content: []llm.Content{
 						{
-							Content:     "What do you want to do next? Please call the TaskComplete tool after you have completed the users task",
+							Content:     "What do you want to do next? Please call the `NextAgentSelector` tool after you have completed the users task",
 							ContentType: "text",
 						},
 					},
@@ -238,9 +245,25 @@ func Execute(definition *WorkflowDefinition) (chan interface{}, error) {
 
 	graph.SetStartNode(definition.StartAgent)
 	go func() {
-		_, err := graph.Execute(clan.ExecuteOptions{
+		traversalDepth := 100
+		if definition.TraversalDepth > 0 {
+			traversalDepth = definition.TraversalDepth
+		}
+
+		var checkpointProvider checkpointer.Checkpointer
+		var err error
+		if definition.Checkpoint != nil {
+			checkpointProvider, err = checkpointer.NewCheckpointerWithName(definition.Checkpoint.Type, definition.Checkpoint.ConnectionString)
+			if err != nil {
+				log.Printf("Could not setup checkpointer %s", err)
+			}
+		}
+
+		_, err = graph.Execute(clan.ExecuteOptions{
 			StreamChannel:  streamChannel,
-			TraversalDepth: 27,
+			TraversalDepth: traversalDepth,
+			Checkpointer:   checkpointProvider,
+			WorkflowID:     workflowID,
 		})
 		if err != nil {
 			log.Printf("Error occured during execution %s", err)

@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/fatih/color"
+	"github.com/google/uuid"
 	"github.com/rodaine/table"
 	"gopkg.in/yaml.v3"
 )
@@ -24,7 +25,8 @@ func main() {
 		os.Exit(-1)
 	}
 
-	sChan, err := workflow.Execute(def)
+	workflowID := uuid.New()
+	sChan, err := workflow.Execute(def, workflowID.String())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to execute your workflow: %s\n", err)
 		os.Exit(-1)
