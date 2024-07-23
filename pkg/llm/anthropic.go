@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 )
@@ -103,7 +102,7 @@ func (a *Anthropic) Generate(messages []Message) ([]Message, error) {
 		return nil, fmt.Errorf("Error calling Anthropic %s", string(respBytes))
 	}
 
-	log.Printf("Response from Anthropic %+v", string(respBytes))
+	// log.Printf("Response from Anthropic %+v", string(respBytes))
 
 	ar := anthropicResponse{}
 	err = json.Unmarshal(respBytes, &ar)

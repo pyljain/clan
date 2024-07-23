@@ -104,7 +104,7 @@ func Execute(definition *WorkflowDefinition, workflowID string) (chan interface{
 			}
 			ws.CurrentAgent = agent.Name
 
-			log.Printf("HISTORY SENT TO THE MODEL IS %+v\n", ws.AgentHistory[agent.Name])
+			// log.Printf("HISTORY SENT TO THE MODEL IS %+v\n", ws.AgentHistory[agent.Name])
 
 			resp, err := model.Generate(ws.AgentHistory[agent.Name])
 			if err != nil {
@@ -135,7 +135,7 @@ func Execute(definition *WorkflowDefinition, workflowID string) (chan interface{
 					toolFound := false
 					for _, t := range tools.AllTools(definition.Tools) {
 						if t.Name() == contentNode.Name {
-							log.Printf("Tool called %s", t.Name())
+							// log.Printf("Tool called %s", t.Name())
 							// Call tool function
 							result, err := t.Execute(contentNode.Input)
 							if err != nil {

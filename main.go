@@ -3,11 +3,13 @@ package main
 import (
 	"clan/pkg/clan"
 	"clan/pkg/workflow"
+	"crypto/sha1"
 	"fmt"
 	"os"
 
 	"github.com/fatih/color"
 	"github.com/google/uuid"
+	"github.com/mitchellh/go-wordwrap"
 	"github.com/rodaine/table"
 	"gopkg.in/yaml.v3"
 )
@@ -32,6 +34,8 @@ func main() {
 		os.Exit(-1)
 	}
 
+	oldPlanHash := ""
+	planHash := ""
 	for element := range sChan {
 		res := element.(clan.StreamState[workflow.WorkflowState])
 		if res.State.CurrentAgent == "" {
@@ -53,16 +57,27 @@ func main() {
 				}
 			}
 		}
-		fmt.Println(agentColor("Plan"))
 
-		headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
-		columnFmt := color.New(color.FgYellow).SprintfFunc()
-		tbl := table.New("Name", "Description", "Owner", "Status")
-		tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
+		pHash := sha1.New()
 		for _, task := range res.State.Plan {
-			tbl.AddRow(task.Name, task.Description, task.Owner, task.Status)
+			taskString := fmt.Sprintf("%s-%s-%s-%s", task.Name, task.Description, task.Owner, task.Status)
+			pHash.Write([]byte(taskString))
 		}
-		tbl.Print()
+
+		oldPlanHash = planHash
+		planHash = fmt.Sprintf("%x", pHash.Sum([]byte{}))
+		if planHash != oldPlanHash && len(res.State.Plan) > 0 {
+			fmt.Println(agentColor("Plan"))
+			headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
+			columnFmt := color.New(color.FgYellow).SprintfFunc()
+			tbl := table.New("Name", "Description", "Owner", "Status")
+			tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
+			for _, task := range res.State.Plan {
+				tbl.AddRow(task.Name, wordwrap.WrapString(task.Description, 100), task.Owner, task.Status)
+			}
+			tbl.Print()
+		}
+
 	}
 }
 
