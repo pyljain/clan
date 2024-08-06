@@ -1,0 +1,37 @@
+name: Research
+description: "Search"
+type: Workflow Definition
+goal: "Your task is to write an essay on the current Wimbledon champion."
+start_agent: Researcher
+checkpoint:
+  type: sqlite3
+  connection_string: "./wimbledon.db"
+agents:
+- name: Researcher
+  purpose: "Find information and write an essay"
+  system_prompt: |
+    Your job is to write a detailed essay on the topic the user specifies.
+
+    Please write the essay in markdown format to a file called `wimbledon_essay.md`. Please call the NextAgentSelector tool after you have completed your task.
+  model: claude-3-5-sonnet-20240620
+  temperature: 0.2
+  next_agent: End
+  available_tools: 
+  - SerperSearch
+  - Writer
+  - NextAgentSelector
+
+tools:
+- name: SerperSearch
+  description: "Google search for a term"
+  parameters:
+  - name: term
+    description: "The term to search for"
+    type: string
+  function: |
+    def serpersearch(term):
+      result = post('https://google.serper.dev/search', {
+        "X-API-KEY": getEnv("SERPER_KEY"),
+        "Content-Type": "application/json"
+      }, '{"q": "' + term + '"}')
+      return result
